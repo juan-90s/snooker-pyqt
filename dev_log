@@ -1,0 +1,32 @@
+Dev 10/4/23
+- try grid divider, result is bad
+
+Dev 9/30/23
+- fix circle to egde contact (not done)
+- known 
+  - inerita_tenser 
+
+Dev 9/29/23
+- elasticity
+- angular velocity (not done)
+
+Dev 9/28/23
+- apply physics class to snooker
+- fix bunch of bugs in yesterday work
+- python property only available for builtin base type 
+
+Dev 9/27/23
+- write more real physics classes 
+  - ball to ball collision
+
+Dev 9/26/23
+- mouse events for create balls
+- hit balls
+- fix collision boundary
+- known issue
+  - collision solver is not accurate 
+
+Dev 9/25/23
+- ball collision physics
+- thread pool to solve ball collision
+- ball painting
