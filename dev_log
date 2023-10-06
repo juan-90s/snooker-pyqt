@@ -1,5 +1,8 @@
+Dev 10/5/23
+- write lighting model
+
 Dev 10/4/23
-- try grid divider, result is bad
+- try calculate collision in grid, the result is bad. 
 
 Dev 9/30/23
 - fix circle to egde contact (not done)

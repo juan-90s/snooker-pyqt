@@ -1,10 +1,11 @@
 from PySide6.QtCore import QSize, Qt, Signal, Slot, QThreadPool, QRunnable, QTimer
-from PySide6.QtGui import QColor, QPainter, QPixmap, QVector2D as Vec2, QRasterWindow, QTransform
+from PySide6.QtGui import QColor, QPainter, QPixmap, QVector2D as Vec2, QRasterWindow, QTransform, QImage
 
 from physics import PhysicsManager, Body, Circle, Edge, Shape, PhysicsManager_Grid
 
 import math
 from enum import Enum
+import timeit
 
 def rotatePixmap(pm: QPixmap, radian: float) -> QPixmap:
         w = pm.size().width()
@@ -158,12 +159,17 @@ class SnookerBoard(QRasterWindow):
         self.mouseRightPressed = False
         self.mouseLeftPressed = False
 
-        self.ball_pixmap = QPixmap()
-        self.ball_pixmap.load("ball.png")
+        ball_pixmap = QPixmap()
+        ball_pixmap.load("ball.png")
+        self.ball_pixmap = ball_pixmap.scaled(Ball.radius*2*self.zoom, Ball.radius*2*self.zoom)
+
+        ball_image = QImage()
+        ball_image.load("ball.png")
+        self.ball_image = ball_image.scaled(Ball.radius*2*self.zoom, Ball.radius*2*self.zoom)
 
         self.background = QPixmap()
-        self.background.load("snookeboard.png")
-
+        self.background.load("board.png")
+        self.render_time = 0
         # start loop
         self._timer.start()
     
@@ -214,7 +220,9 @@ class SnookerBoard(QRasterWindow):
     
     def paintEvent(self, e):
         with QPainter(self) as p:
+            t = timeit.default_timer()
             self.render(p)
+            self.render_time = 1000 * (timeit.default_timer() - t)
 
     def render(self,p):
         zoom = self.zoom
@@ -222,15 +230,16 @@ class SnookerBoard(QRasterWindow):
         p.drawPixmap(0,0,self.width(), self.height(), self.background)
         p.setPen(QColor(250, 120, 120))
         p.drawText(40, 40, 'physic_time: '+str(self.physicManager.frametime))
+        p.drawText(40, 50, 'render_time: '+str(self.render_time))
         for ball in self.ball_list:
             render_r = int(Ball.radius * zoom)
             pos = ball.position() * zoom
             p.drawEllipse(pos.toPoint(), render_r, render_r)
-            pm = self.ball_pixmap
-            p.drawPixmap(pos.x() - render_r, pos.y() - render_r, render_r * 2, render_r * 2, pm)
+            p.drawImage(pos.x() - render_r, pos.y() - render_r, self.ball_image)
+            #p.drawPixmap(pos.x() - render_r, pos.y() - render_r, pm)
+            
         
         if self.ball_focused:
-            p.drawText(40, 50, 'ball_speed: '+str(self.ball_focused.speed()/self._timer.interval()))
             p.setPen(QColor(200, 200, 200))
             pos = self.ball_focused.position()
             p.drawEllipse((pos * zoom).toPoint(), render_r // 2, render_r // 2)
