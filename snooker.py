@@ -2,6 +2,8 @@ from PySide6.QtCore import QSize, Qt, Signal, Slot, QThreadPool, QRunnable, QTim
 from PySide6.QtGui import QColor, QPainter, QPixmap, QVector2D as Vec2, QRasterWindow, QTransform, QImage
 
 from physics import PhysicsManager, Body, Circle, Edge, Shape, PhysicsManager_Grid
+from lighting import LightSource, LightingManager, Material
+from lighting.common import *
 
 import math
 from enum import Enum
@@ -23,6 +25,7 @@ class Ball(object):
         super().__init__()
         self.body = Body(Circle(Ball.radius),Body.Type.Dynamic)
         self.body.position = pos
+        self.image = None
 
     
     def position(self) -> Vec2:
@@ -79,7 +82,7 @@ class Cushion():
 class SnookerBoard(QRasterWindow):
     physicManager: PhysicsManager
     board_size = Vec2(400,800)
-
+    lighting_update_step_num = 3
     def __init__(self, width:int, height:int, parent=None):
         super().__init__(parent)
 
@@ -96,8 +99,10 @@ class SnookerBoard(QRasterWindow):
         self.hit_timer = QTimer(self)
         self.hit_timer.setInterval(2000)
         
+        # Objects
         self.ball_list = []
         self.ball_focused = None
+
 
         pockets = []
         pockets.append(Vec2(5/128,5/256) * world_size)
@@ -110,14 +115,14 @@ class SnookerBoard(QRasterWindow):
 
         cushions = []
         # Top and Bottom
-        cushions.append(Cushion(Vec2(14/128, 8/256) * world_size, Vec2(114/128, 8/256) * world_size, Cushion.Face.DOWN))
-        cushions.append(Cushion(Vec2(14/128, 248/256) * world_size, Vec2(114/128, 248/256) * world_size, Cushion.Face.UP))
+        cushions.append(Cushion(Vec2(15/128, 8/256) * world_size, Vec2(113/128, 8/256) * world_size, Cushion.Face.DOWN))
+        cushions.append(Cushion(Vec2(15/128, 248/256) * world_size, Vec2(113/128, 248/256) * world_size, Cushion.Face.UP))
         # Left Top and Left Bottom
-        cushions.append(Cushion(Vec2(8/128, 14/256) * world_size, Vec2(8/128, 120/256) * world_size, Cushion.Face.RIGHT))
-        cushions.append(Cushion(Vec2(8/128, 137/256) * world_size, Vec2(8/128, 242/256) * world_size, Cushion.Face.RIGHT))
+        cushions.append(Cushion(Vec2(8/128, 15/256) * world_size, Vec2(8/128, 120/256) * world_size, Cushion.Face.RIGHT))
+        cushions.append(Cushion(Vec2(8/128, 137/256) * world_size, Vec2(8/128, 241/256) * world_size, Cushion.Face.RIGHT))
         # Right Top and Right Bottom
-        cushions.append(Cushion(Vec2(120/128, 14/256) * world_size, Vec2(120/128, 120/256) * world_size, Cushion.Face.LEFT))
-        cushions.append(Cushion(Vec2(120/128, 137/256) * world_size, Vec2(120/128, 242/256) * world_size, Cushion.Face.LEFT))
+        cushions.append(Cushion(Vec2(120/128, 15/256) * world_size, Vec2(120/128, 120/256) * world_size, Cushion.Face.LEFT))
+        cushions.append(Cushion(Vec2(120/128, 137/256) * world_size, Vec2(120/128, 241/256) * world_size, Cushion.Face.LEFT))
         self.cushions = cushions
 
 
@@ -159,17 +164,53 @@ class SnookerBoard(QRasterWindow):
         self.mouseRightPressed = False
         self.mouseLeftPressed = False
 
-        ball_pixmap = QPixmap()
-        ball_pixmap.load("ball.png")
-        self.ball_pixmap = ball_pixmap.scaled(Ball.radius*2*self.zoom, Ball.radius*2*self.zoom)
+        # Lighting
+        self.lighting_update_step = 0
 
+        self.lighting = LightingManager()
+        self.lighting.ambient_intensity = 0.3
+        paralell = LightSource(LightSource.Type.Parallel)
+        paralell.set_position((0,0,120))
+        paralell.set_direction((0,0,-1))
+        paralell.intensity = 0.3
+        bulb1 = LightSource(LightSource.Type.Spot)
+        bulb1.set_position((200,250,120))
+        bulb1.set_direction((0,0,-1))
+        bulb1.spread = 0.1
+        bulb1.intensity = 5
+        bulb2 = LightSource(LightSource.Type.Spot)
+        bulb2.set_position((200,550,120))
+        bulb2.set_direction((0,0,-1))
+        bulb2.spread = 0.1
+        bulb2.intensity = 5
+        self.lighting.add_light_source(bulb1)
+        self.lighting.add_light_source(bulb2)
+        self.lighting.add_light_source(paralell)
+
+
+        # Texture
         ball_image = QImage()
         ball_image.load("ball.png")
-        self.ball_image = ball_image.scaled(Ball.radius*2*self.zoom, Ball.radius*2*self.zoom)
+        ball_image_array = Array_from_QImage(ball_image)
+        ball_material = Material()
+        ball_material.set_diffuse_map(ball_image_array)
+        ball_material.set_normal_map(sphere_normal(ball_image_array))
+        self.ball_image_array = ball_image_array
+        self.ball_material = ball_material
 
-        self.background = QPixmap()
-        self.background.load("board.png")
+        board_img = QImage()
+        board_img.load("board.png")
+        board_material = Material()
+        board_material.set_diffuse_map(Array_from_QImage(board_img))
+        board_surface = plain_local(board_img.width(), board_img.height(), world_w, world_h)
+        board_texture = self.lighting.illuminate(board_surface, board_material)
+        
+        
+        self.background = QPixmap.fromImage(QImage_from_Array(board_texture))
         self.render_time = 0
+
+
+        
         # start loop
         self._timer.start()
     
@@ -223,20 +264,41 @@ class SnookerBoard(QRasterWindow):
             t = timeit.default_timer()
             self.render(p)
             self.render_time = 1000 * (timeit.default_timer() - t)
+    
+    def resizeEvent(self, event):
+        wh_ratio = self.board_size.x() / self.board_size.y()
+        new_size = event.size()
+        new_width = new_size.width()
+        new_height = new_size.height()
+    
+        if(new_width / new_height  < wh_ratio):
+            new_width = int(new_height * wh_ratio)
+            self.zoom = new_width / self.board_size.x()
+        else:
+            new_height = int(new_width / wh_ratio)
+            self.zoom = new_height / self.board_size.y()
 
     def render(self,p):
         zoom = self.zoom
         # p.fillRect(0, 0, self.width(), self.height(), Qt.black)
-        p.drawPixmap(0,0,self.width(), self.height(), self.background)
+        p.drawPixmap(0,0,self.board_size.x() * zoom, self.board_size.y() * zoom, self.background)
         p.setPen(QColor(250, 120, 120))
+        p.drawText(40, 30, 'mouse_point: '+str(self.cursor_position.toTuple()))
         p.drawText(40, 40, 'physic_time: '+str(self.physicManager.frametime))
         p.drawText(40, 50, 'render_time: '+str(self.render_time))
+
+        self.lighting_update_step = (self.lighting_update_step + 1) % self.lighting_update_step_num
+
         for ball in self.ball_list:
             render_r = int(Ball.radius * zoom)
             pos = ball.position() * zoom
-            p.drawEllipse(pos.toPoint(), render_r, render_r)
-            p.drawImage(pos.x() - render_r, pos.y() - render_r, self.ball_image)
-            #p.drawPixmap(pos.x() - render_r, pos.y() - render_r, pm)
+            if self.lighting_update_step == 0:
+                ball_surface = self.ball_material.normal_map*Ball.radius + Array_from_QVector3D(ball.position().toVector3D())
+                ball.image = QImage_from_Array(self.lighting.illuminate(ball_surface, self.ball_material))
+            if ball.image is not None:
+                p.drawImage(pos.x() - render_r, pos.y() - render_r, ball.image.scaled(render_r*2, render_r*2))
+            else:
+                p.drawEllipse(pos.toPoint(), render_r, render_r)
             
         
         if self.ball_focused:
@@ -262,11 +324,20 @@ class SnookerBoard(QRasterWindow):
     def update(self):
         super().update()
         for ball in self.ball_list:
-            for hole in self.pockets:
-                if (ball.position() - hole).lengthSquared() < Ball.radius:
-                    self.remove_ball(ball)
-                    self.ball_focused = None
-                    print("hit")
+            hit = False
+            pos = ball.position()
+            if (pos.x() < 3 or pos.x() > self.board_size.x() - 3) or (pos.y() < 3 or pos.y() > self.board_size.y() - 3):
+                hit = True
+            else:
+                for hole in self.pockets:
+                    if (pos - hole).lengthSquared() < Ball.radius:
+                        hit = True
+                        break
+            
+            if hit:
+                self.remove_ball(ball)
+                self.ball_focused = None
+                print("hit")
     
     
 
