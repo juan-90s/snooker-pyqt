@@ -41,4 +41,5 @@ class LightSource():
     
     def set_color(self, color):
         if isinstance(color, QColor):
-            self.color = np.array((color.redF(), color.greenF(), color.blueF()))
+            # The default Qt image format is in ARGB32, which store like 0xBBGGRRAA
+            self.color = np.array((color.blueF(), color.greenF(), color.redF()))
