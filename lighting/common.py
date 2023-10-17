@@ -1,11 +1,11 @@
 import numpy as np
-from PySide6.QtGui import QVector2D, QVector3D, QPixmap, QImage
+from PySide6.QtGui import QVector2D, QVector3D, QPixmap, QImage, QTransform
 
 def plain_local(width, height, width_world=None, height_world=None) ->np.ndarray:
     if width_world is None:
         width_world = width
     if height_world is None:
-        width_world = height
+        height_world = height
     x = np.linspace(0, width_world - 1, width)
     y = np.linspace(0, height_world - 1, height)
     X,Y = np.meshgrid(x,y)
@@ -49,11 +49,9 @@ def Array_from_QImage(qimage: QImage) -> np.ndarray:
         colors = 3
     pixel_data = qimage.constBits()
     image_array = np.frombuffer(pixel_data, dtype=np.uint8).reshape((height, width, colors)).astype(dtype=np.float32)
-    # image_array = np.transpose(image_array, (1,0,2))
     return image_array
 
 def QImage_from_Array(image_array: np.ndarray) -> QImage:
-    # image_array = np.transpose(image_array, (1,0,2))
     height, width = image_array.shape[:2]
     image_array = image_array.astype(dtype=np.uint8)
     colors = image_array.shape[2]
@@ -62,5 +60,8 @@ def QImage_from_Array(image_array: np.ndarray) -> QImage:
 def Array_from_QVector3D(vector: QVector3D) -> np.ndarray:
     return np.array(vector.toTuple())
 
+def Matrix_from_QTransform(t: QTransform) -> np.ndarray:
+    # column major to row major
+    return np.array([[t.m11(), t.m21(), t.m31()],[t.m12(), t.m22(), t.m32()],[t.m13(), t.m23(), t.m33()]])
 
 

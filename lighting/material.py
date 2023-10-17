@@ -12,6 +12,8 @@ class Material():
         self.diffuse_map = None
         self.normal_map = None
         self.alpha_map = None
+        self.smoothness = 0
+        self.metalness = 1
     def set_diffuse_map(self, _map: np.ndarray):
         self.diffuse_map = _map[:,:,:3]
         if _map.shape[2] == 4:
