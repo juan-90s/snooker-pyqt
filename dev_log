@@ -1,3 +1,15 @@
+Dev 10/12/23
+- implement phong light
+
+Dev 10/10/23
+- write showcase for physics
+- tune the physics
+
+Dev 10/6/23
+- implement lighting initially
+- decrease lighting simulation time by overstep 3 in render loop
+- skip zero speed body in contact check, sincerely decrease physics time
+
 Dev 10/5/23
 - write lighting model
 

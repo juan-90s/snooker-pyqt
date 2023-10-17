@@ -53,11 +53,16 @@ class PhysicsManager():
                 continue
             if self.global_friction > 0 and body.linear_velocity.lengthSquared() > 0:
                 # apply slow donw effect
-                linear_velocity_after = body.linear_velocity - (1 - self.global_friction * body.friction) * dt * body.linear_velocity - self.global_friction * dt * body.linear_velocity.normalized()
+                linear_velocity_after = body.linear_velocity - (1 - self.global_friction * body.friction) * dt * body.linear_velocity - 3 * self.global_friction * dt * body.linear_velocity.normalized()
                 if Vec2.dotProduct(linear_velocity_after, body.linear_velocity) > 0:
                     body.linear_velocity = linear_velocity_after
                 else:
                     body.linear_velocity *= 0
+                angle_velocity_after = body.angle_velocity - body.angle_velocity**0 * self.global_friction * dt
+                if angle_velocity_after * body.angle_velocity > 0:
+                    body.angle_velocity = angle_velocity_after
+                else:
+                    body.angle_velocity = 0.0
         
 
     def solve_contact(self):
